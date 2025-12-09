@@ -34,12 +34,12 @@ class SegTool(QMainWindow):
         widget.setLayout(window_layout)
         
         # HELP BUTTON
-        help_button = QPushButton("Aide")
+        help_button = QPushButton("Help")
         help_button.setMaximumWidth(100)
         window_layout.addWidget(help_button, alignment=Qt.AlignRight)
 
         # MAIN UNDER WIDGETS
-        parametre_box = QGroupBox("Paramètres")
+        parametre_box = QGroupBox("Parameters")
         parametre_box.setMaximumHeight(200)
         window_layout.addWidget(parametre_box)
         
@@ -50,8 +50,8 @@ class SegTool(QMainWindow):
         interaction_box.setMaximumSize(400, 100)
         window_layout.addWidget(interaction_box, alignment=Qt.AlignRight)
     
-    # FRAME PARAMETRES
-        choose_model = QLabel("Choisir le fichier correspondant au modèle de segmentation")
+    # PARAMETERS FRAME
+        choose_model = QLabel("Choose the file corresponding to the segmentation model")
         choose_model.setMaximumWidth(200)
         self.models_box = QComboBox()
         models = ["UNET_a_160.h5", "UNET_b_160_IOU.h5", "UNET_a_160_IOU.h5"]
@@ -60,27 +60,27 @@ class SegTool(QMainWindow):
         self.models_box.currentIndexChanged.connect(self.modelSelection)
         self.models_box.setMaximumWidth(200)
     
-        choose_us_image = QLabel("Choisir image ultrasonore")
+        choose_us_image = QLabel("Choose ultrasound image")
         choose_us_image.setMaximumWidth(200)
         
-        browse_us_image = QPushButton("Parcourir")
+        browse_us_image = QPushButton("Browse")
         browse_us_image.setMaximumWidth(200)
         browse_us_image.clicked.connect(self.getUsFile)
         
-        contrast_image = QPushButton("Améliorer le contraste de l'image")
+        contrast_image = QPushButton("Improve image contrast")
         contrast_image.setIcon(QIcon("stars2.png"))
         contrast_image.setMaximumWidth(200)
         contrast_image.clicked.connect(self.contrastImage)
         
-        crop_image = QPushButton("Rogner l'image")
+        crop_image = QPushButton("Crop image")
         crop_image.setMaximumWidth(200)
         crop_image.clicked.connect(self.cropImage)
         
-        choose_mask_image = QLabel("Voulez vous ajouter une masque de comparaison?")
+        choose_mask_image = QLabel("Do you want to add a comparison mask?")
         choose_mask_image.setMaximumWidth(400)
         
 
-        browse_mask_image = QPushButton("Parcourir")
+        browse_mask_image = QPushButton("Browse")
         browse_mask_image.setMaximumWidth(200)
         browse_mask_image.clicked.connect(self.getMaskFile)
 
@@ -96,12 +96,12 @@ class SegTool(QMainWindow):
 
         parametres_layout.addWidget(browse_mask_image, 2, 1)
     
-    #  FRAME AFFICHAGE D'IMAGE
+    # IMAGE DISPLAY FRAME
         # US IMAGE FRAME
         us_img_frame = QFrame()
         self.configureImageFrame(us_img_frame)
 
-        us_img_label = QLabel("Image ultrasonore", us_img_frame)
+        us_img_label = QLabel("Ultrasound Image", us_img_frame)
         us_img_label.setAlignment(Qt.AlignCenter)
         self.us_img_view = QLabel(us_img_frame)
         self.us_img_view.setAlignment(Qt.AlignCenter)
@@ -113,18 +113,18 @@ class SegTool(QMainWindow):
         self.configureImageFrame(self.contrasted_img_frame)
         
         self.contrast_activated = False
-        contrasted_us_img_label = QLabel("Image contrastée")
+        contrasted_us_img_label = QLabel("Contrasted Image")
         contrasted_us_img_label.setAlignment(Qt.AlignCenter)
         self.contrasted_us_img_view = QLabel()
         self.contrasted_us_img_view.setAlignment(Qt.AlignCenter)
         
         self.configureImageLayout(self.contrasted_img_frame, contrasted_us_img_label, self.contrasted_us_img_view)
         
-        # FRAME MASK IMAGE
+        # MASK IMAGE FRAME
         self.mask_img_frame = QFrame()
         self.configureImageFrame(self.mask_img_frame)
         
-        mask_img_label = QLabel("Masque")
+        mask_img_label = QLabel("Mask")
         mask_img_label.setAlignment(Qt.AlignCenter)
         self.mask_img_view = QLabel()
         self.mask_img_view.setAlignment(Qt.AlignCenter)
@@ -135,7 +135,7 @@ class SegTool(QMainWindow):
         seg_img_frame = QFrame()
         self.configureImageFrame(seg_img_frame)
         
-        seg_img_label = QLabel("Image segmentée")
+        seg_img_label = QLabel("Segmented Image")
         seg_img_label.setAlignment(Qt.AlignCenter)
         self.seg_img_view = QLabel()
         self.seg_img_view.setAlignment(Qt.AlignCenter)
@@ -149,16 +149,16 @@ class SegTool(QMainWindow):
         image_layout.addWidget(self.mask_img_frame, 0, 2)
         image_layout.addWidget(seg_img_frame, 0, 3)
 
-        # FRAME A CACHER
+        # FRAME TO HIDE
         self.mask_img_frame.hide()
         self.contrasted_img_frame.hide()
-    # FRAME INTERACTION        
-        run_seg_button = QPushButton("Lancer segmentation")
+    # INTERACTION FRAME        
+        run_seg_button = QPushButton("Start segmentation")
         run_seg_button.setIcon(QIcon("run2.png"))
         run_seg_button.setMaximumWidth(300)
         run_seg_button.clicked.connect(self.runSegmentation)
         
-        self.save_seg_button = QPushButton("Sauvegarder image segmentée")
+        self.save_seg_button = QPushButton("Save segmented image")
         self.save_seg_button.setIcon(QIcon("save.ico"))
         self.save_seg_button.setMaximumWidth(300)
         self.save_seg_button.clicked.connect(self.saveSegmentation)
@@ -327,7 +327,7 @@ class cropTool(QDialog):
         return np.array(self.croped_img).astype(np.uint8)
 
 def prepare_image(img_array):
-    '''Transform an PIL image to array with the correct format to display it on PyQt. 
+    '''Transform a PIL image to array with the correct format to display it on PyQt.
     Parameters
     ----------
     img_array: 2D numpy array
@@ -341,7 +341,7 @@ def prepare_image(img_array):
     
 
 def resize_and_sample(img_array):
-    '''Sample and crop the image. 
+    '''Sample and crop the image.
     Parameters
     ----------
     img_array: : 2D numpy array
@@ -349,20 +349,20 @@ def resize_and_sample(img_array):
     
     Returns 2D numpy array
     '''
-    img_array = regular_sample(img_array) # échantilloner image
-    sized_array = shape_to(img_array) # mettre à la bonne taille l'image
+    img_array = regular_sample(img_array) # sample image
+    sized_array = shape_to(img_array) # resize image to correct size
     
     return sized_array
 
 
 def save_image(seg_img_array, seg_filename):
-    '''Save an image from a 2D array. 
+    '''Save an image from a 2D array.
     Parameters
     ----------
     seg_img_array: 2D numpy array
-        segmentated image to be saved
+        segmented image to be saved
     seg_filename: str
-        path wanted to save the segmentated picture
+        path where the segmented image should be saved
     
     Returns None
     '''
@@ -371,9 +371,9 @@ def save_image(seg_img_array, seg_filename):
     seg_img.save(seg_filename)
         
 
-def make_prediction(sized_array, model_path="models/UNET_a_160.h5"): # garder le 1er de la combo box en valeur par défaut
-    loaded_model = tf.keras.models.load_model(model_path, compile=False) # charger modèle
-    seg_img_array = create_img_from_predictions(make_predictions(sized_array, loaded_model)) # faire la prédiction forward
+def make_prediction(sized_array, model_path="models/UNET_a_160.h5"): # keep the first combo box item as default value
+    loaded_model = tf.keras.models.load_model(model_path, compile=False) # load model
+    seg_img_array = create_img_from_predictions(make_predictions(sized_array, loaded_model)) # perform forward prediction
 
     return seg_img_array
 

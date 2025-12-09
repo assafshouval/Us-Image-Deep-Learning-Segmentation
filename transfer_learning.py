@@ -65,9 +65,9 @@ def flipping(x, y):
     
 def random_rotation(x, y):
 
-    angle = np.random.randint(8) # rotation de +- 8° maximum
+    angle = np.random.randint(8) # rotation of +- 8° maximum
     sens = np.random.randint(2)
-    if sens == 0: # on introduit une rotation dans le sens anti-horaire aléatoirement
+    if sens == 0: # randomly introduce counter-clockwise rotation
         angle *= -1
    
     x_rotated = transform.rotate(x, angle)
@@ -79,8 +79,8 @@ def random_rotation(x, y):
     x_rotated = color.rgb2gray(x_rotated)
     y_rotated = color.rgb2gray(y_rotated)
     
-    #x_rotated = x_rotated*255 à utiliser que si on part de photos
-    # on multiplie pas y par 255 car on veut que ca reste entre 0 et 1
+    #x_rotated = x_rotated*255 use only if starting from photos
+    # do not multiply y by 255 because we want it to stay between 0 and 1
 
     return (np.reshape(x_rotated, (160, 160, 1)), np.reshape(y_rotated, (160, 160, 1)))
     
@@ -123,7 +123,7 @@ def show_augmentated_img():
 
 
 def init_model():
-    #loaded_model = tf.keras.models.load_model("Trained_models/UNET_b_160_IOU.h5", compile=False) # Chargement du modèle entraîné
+    #loaded_model = tf.keras.models.load_model("Trained_models/UNET_b_160_IOU.h5", compile=False) # Load trained model
     loaded_model = tf.keras.models.load_model("UNET_b_160_IOU.h5", compile=False)
 
     encoding_layers_a = ['input_1', 'batch_normalization_1', 'conv2d_1', 'batch_normalization_2', 'conv2d_2', 'batch_normalization_3', 
@@ -168,10 +168,10 @@ def training_session(segmentation_results_path, saved_weights_path, EPOCHS=1, IN
     print("Model loaded.")
     
     # GET TRAINING, VALIDATION AND TESTING DATA from array
-    #x_training_dataset = open_pkl_matrix("whole_dataset/training_dataset/x/pkl") # à changer sur mon ordi: rajouter OASBUDdata au début
-    #y_training_dataset = open_pkl_matrix("whole_dataset/training_dataset/y/pkl")/255 #• on a besoin de 0 ou de 1
+    #x_training_dataset = open_pkl_matrix("whole_dataset/training_dataset/x/pkl") # need to change: add OASBUDdata at beginning
+    #y_training_dataset = open_pkl_matrix("whole_dataset/training_dataset/y/pkl")/255 # need 0 or 1
     #x_validation = open_pkl_matrix("whole_dataset/validation_dataset/x/pkl")
-    #y_validation = open_pkl_matrix("whole_dataset/validation_dataset/y/pkl")/255 #• on a besoin de 0 ou de 1
+    #y_validation = open_pkl_matrix("whole_dataset/validation_dataset/y/pkl")/255 # need 0 or 1
     #testing_dataset = open_pkl_matrix("whole_dataset/testing_dataset/x/pkl")    
     
     # GET TRAINING, VALIDATION AND TESTING DATA from images create_dataset_from_images
@@ -224,20 +224,20 @@ def training_session(segmentation_results_path, saved_weights_path, EPOCHS=1, IN
     # TESTING THE MODEL
     file_nbr = 0
     for data in testing_dataset:
-        predictions = loaded_model.predict(np.reshape(data, (1, 160, 160))) # Faire prédiction
-        predictions = np.reshape(predictions, (160, 160)) # Remettre au bon format le tableau des prédictions
+        predictions = loaded_model.predict(np.reshape(data, (1, 160, 160))) # Make prediction
+        predictions = np.reshape(predictions, (160, 160)) # Restore predictions array to correct format
 
-        # Remplacer la prédiction par la valeur de pixel qu'elle approxime 
+        # Replace prediction with pixel value it approximates 
         classified_predictions = np.ones((160, 160))
         for i in range(160):
             for j in range(160):
                 if predictions[(i, j)] < 0.5:
-                    classified_predictions[(i, j)] = 0 # noir
+                    classified_predictions[(i, j)] = 0 # black
                 else: 
-                    classified_predictions[(i, j)] = 255 # blanc
+                    classified_predictions[(i, j)] = 255 # white
 
-        seg_img = Image.fromarray(classified_predictions) # Transformer le tableau np en image
-        seg_img = seg_img.convert('L') # Convertir l'image en noir et blanc
+        seg_img = Image.fromarray(classified_predictions) # Convert numpy array to image
+        seg_img = seg_img.convert('L') # Convert image to black and white
         #seg_img.show() # Afficher l'image
         filename = segmentation_results_path + testing_filenames[file_nbr] + ".jpg"
         seg_img.save(filename)

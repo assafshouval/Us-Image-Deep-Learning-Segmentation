@@ -61,26 +61,26 @@ def make_prediction(img_array, mask_array, model_path, seg_saving_path):
 
     loaded_model = tf.keras.models.load_model(model_path, compile=False)
     
-    # calculer erreurs de prédiction
+    # calculate prediction errors
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(5e-4, decay_steps=1e5, decay_rate=2e-05, staircase=True)
     loaded_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
               loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
               metrics=[tf.keras.metrics.MeanIoU(num_classes=2)]) 
     loaded_model.evaluate(np.reshape(img_array, (1, 160, 160)), np.reshape(mask_array/255, (1, 160, 160)), batch_size=2)
     
-    # faire la segmentation
+    # perform segmentation
     predictions = loaded_model.predict(np.reshape(img_array, (1, 160, 160))) 
-    predictions = np.reshape(predictions, (160, 160)) # Remettre au bon format le tableau des prédictions
-    # Remplacer la prédiction par la valeur de pixel qu'elle approxime 
+    predictions = np.reshape(predictions, (160, 160)) # Restore predictions array to correct format
+    # Replace prediction with pixel value it approximates 
     classified_predictions = np.ones((160, 160))
     for i in range(160):
         for j in range(160):
             if predictions[(i, j)] < 0.5:
-                classified_predictions[(i, j)] = 0 # noir
+                classified_predictions[(i, j)] = 0 # black
                 
             else: 
-                classified_predictions[(i, j)] = 255 # blanc
-    save_img_from_array(classified_predictions, seg_saving_path) # sauvegarder image segmentée
+                classified_predictions[(i, j)] = 255 # white
+    save_img_from_array(classified_predictions, seg_saving_path) # save segmented image
 
     
 def main():
