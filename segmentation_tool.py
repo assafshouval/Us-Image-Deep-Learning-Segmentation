@@ -71,10 +71,15 @@ class SegTool(QMainWindow):
         choose_model.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
         self.models_box = QComboBox()
         models = ["UNET_a_160.h5", "UNET_b_160_IOU.h5", "UNET_a_160_IOU.h5"]
-        self.selected_model = "models/" + models[0]
-        self.models_box.addItems(models)    
+        for model_name in models:
+            model_path = os.path.join("models", model_name)
+            self.models_box.addItem(model_name, model_path)
+        self.selected_model = self.models_box.currentData(Qt.UserRole)
         self.models_box.currentIndexChanged.connect(self.modelSelection)
         self.models_box.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
+        browse_model_button = QPushButton("Add model")
+        browse_model_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
+        browse_model_button.clicked.connect(self.addModelFile)
     
         choose_us_image = QLabel("Choose ultrasound image")
         choose_us_image.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
@@ -104,6 +109,7 @@ class SegTool(QMainWindow):
         
         parametres_layout.addWidget(choose_model, 0, 0)
         parametres_layout.addWidget(self.models_box, 0, 1)
+        parametres_layout.addWidget(browse_model_button, 0, 2)
         parametres_layout.addWidget(choose_us_image, 1, 0)
         parametres_layout.addWidget(browse_us_image, 1, 1)
         parametres_layout.addWidget(contrast_image, 1, 2)
@@ -201,7 +207,22 @@ class SegTool(QMainWindow):
         
     
     def modelSelection(self):
-        self.selected_model = "models/" + self.models_box.currentText() 
+        model_data = self.models_box.currentData(Qt.UserRole)
+        self.selected_model = model_data if model_data else self.models_box.currentText()
+
+
+    def addModelFile(self):
+        model_path, _ = QFileDialog.getOpenFileName(self, "Select segmentation model", "", "Model Files (*.h5 *.hdf5);;All Files (*)")
+        if not model_path:
+            return
+
+        existing_index = self.models_box.findData(model_path)
+        if existing_index == -1:
+            display_name = os.path.basename(model_path)
+            self.models_box.addItem(display_name, model_path)
+            existing_index = self.models_box.count() - 1
+
+        self.models_box.setCurrentIndex(existing_index)
 
 
     def getUsFile(self):
