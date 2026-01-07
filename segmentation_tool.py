@@ -15,6 +15,22 @@ from PyQt5.QtGui import *
 from image_processing import *
 
 
+class AppConfig:
+    HELP_BUTTON_WIDTH = 100
+    PARAM_BOX_HEIGHT = 200
+    INTERACTION_BOX_WIDTH = 400
+    INTERACTION_BOX_HEIGHT = 100
+    
+    LABEL_WIDTH_SMALL = 200
+    LABEL_WIDTH_LARGE = 400
+    
+    BUTTON_WIDTH_SMALL = 200
+    BUTTON_WIDTH_LARGE = 300
+    
+    CROP_TOOL_WIDTH = 1280
+    CROP_TOOL_HEIGHT = 800
+
+
 class SegTool(QMainWindow):
     
     def __init__(self):
@@ -35,53 +51,53 @@ class SegTool(QMainWindow):
         
         # HELP BUTTON
         help_button = QPushButton("Help")
-        help_button.setMaximumWidth(100)
+        help_button.setMinimumWidth(AppConfig.HELP_BUTTON_WIDTH)
         window_layout.addWidget(help_button, alignment=Qt.AlignRight)
 
         # MAIN UNDER WIDGETS
         parametre_box = QGroupBox("Parameters")
-        parametre_box.setMaximumHeight(200)
+        parametre_box.setMinimumHeight(AppConfig.PARAM_BOX_HEIGHT)
         window_layout.addWidget(parametre_box)
         
         images_box = QGroupBox("Images")
         window_layout.addWidget(images_box)
         
         interaction_box = QFrame()
-        interaction_box.setMaximumSize(400, 100)
+        interaction_box.setMinimumSize(AppConfig.INTERACTION_BOX_WIDTH, AppConfig.INTERACTION_BOX_HEIGHT)
         window_layout.addWidget(interaction_box, alignment=Qt.AlignRight)
     
     # PARAMETERS FRAME
         choose_model = QLabel("Choose the file corresponding to the segmentation model")
-        choose_model.setMaximumWidth(200)
+        choose_model.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
         self.models_box = QComboBox()
         models = ["UNET_a_160.h5", "UNET_b_160_IOU.h5", "UNET_a_160_IOU.h5"]
         self.selected_model = "models/" + models[0]
         self.models_box.addItems(models)    
         self.models_box.currentIndexChanged.connect(self.modelSelection)
-        self.models_box.setMaximumWidth(200)
+        self.models_box.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
     
         choose_us_image = QLabel("Choose ultrasound image")
-        choose_us_image.setMaximumWidth(200)
+        choose_us_image.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
         
         browse_us_image = QPushButton("Browse")
-        browse_us_image.setMaximumWidth(200)
+        browse_us_image.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
         browse_us_image.clicked.connect(self.getUsFile)
         
         contrast_image = QPushButton("Improve image contrast")
         contrast_image.setIcon(QIcon("stars2.png"))
-        contrast_image.setMaximumWidth(200)
+        contrast_image.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
         contrast_image.clicked.connect(self.contrastImage)
         
         crop_image = QPushButton("Crop image")
-        crop_image.setMaximumWidth(200)
+        crop_image.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
         crop_image.clicked.connect(self.cropImage)
         
         choose_mask_image = QLabel("Do you want to add a comparison mask?")
-        choose_mask_image.setMaximumWidth(400)
+        choose_mask_image.setMinimumWidth(AppConfig.LABEL_WIDTH_LARGE)
         
 
         browse_mask_image = QPushButton("Browse")
-        browse_mask_image.setMaximumWidth(200)
+        browse_mask_image.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
         browse_mask_image.clicked.connect(self.getMaskFile)
 
         parametres_layout = QGridLayout(parametre_box)
@@ -155,12 +171,12 @@ class SegTool(QMainWindow):
     # INTERACTION FRAME        
         run_seg_button = QPushButton("Start segmentation")
         run_seg_button.setIcon(QIcon("run2.png"))
-        run_seg_button.setMaximumWidth(300)
+        run_seg_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_LARGE)
         run_seg_button.clicked.connect(self.runSegmentation)
         
         self.save_seg_button = QPushButton("Save segmented image")
         self.save_seg_button.setIcon(QIcon("save.ico"))
-        self.save_seg_button.setMaximumWidth(300)
+        self.save_seg_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_LARGE)
         self.save_seg_button.clicked.connect(self.saveSegmentation)
         
         interaction_layout = QGridLayout(interaction_box)
@@ -247,7 +263,7 @@ class cropTool(QDialog):
         
         self.cropWidget.setModal(True)
         self.setWindowTitle("Crop Tool")
-        self.setFixedSize(1280, 800)
+        self.setFixedSize(AppConfig.CROP_TOOL_WIDTH, AppConfig.CROP_TOOL_HEIGHT)
 
         image_to_crop_view = QLabel()
         self.image_to_crop = Image.fromarray(us_img_array)
@@ -379,6 +395,11 @@ def make_prediction(sized_array, model_path="models/UNET_a_160.h5"): # keep the 
 
 
 def main():
+    if hasattr(Qt, 'AA_EnableHighDpiScaling'):
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
     app = QApplication(sys.argv)
     ex = SegTool()
     ex.showMaximized()
