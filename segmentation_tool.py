@@ -70,7 +70,7 @@ class SegTool(QMainWindow):
         choose_model = QLabel("Choose the file corresponding to the segmentation model")
         choose_model.setMinimumWidth(AppConfig.LABEL_WIDTH_SMALL)
         self.models_box = QComboBox()
-        models = ["UNET_a_160.h5", "UNET_b_160_IOU.h5", "UNET_a_160_IOU.h5"]
+        models = ["AttentionUNet_weights.weights.h5"]
         for model_name in models:
             model_path = os.path.join("models", model_name)
             self.models_box.addItem(model_name, model_path)
