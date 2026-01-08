@@ -47,6 +47,7 @@ class SegTool(QMainWindow):
     def __init__(self):
         super().__init__()
             # GRANDE FENETRE
+        self.directory_windows = []
         self.initUI()
     
     
@@ -116,6 +117,10 @@ class SegTool(QMainWindow):
         browse_mask_image.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
         browse_mask_image.clicked.connect(self.getMaskFile)
 
+        open_directory_button = QPushButton("Open directory")
+        open_directory_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
+        open_directory_button.clicked.connect(self.chooseDirectory)
+
         parametres_layout = QGridLayout(parametre_box)
         
         parametres_layout.addWidget(choose_model, 0, 0)
@@ -128,6 +133,7 @@ class SegTool(QMainWindow):
         parametres_layout.addWidget(choose_mask_image, 2, 0)
 
         parametres_layout.addWidget(browse_mask_image, 2, 1)
+        parametres_layout.addWidget(open_directory_button, 3, 0, 1, 2)
     
     # IMAGE DISPLAY FRAME
         # US IMAGE FRAME
@@ -268,6 +274,26 @@ class SegTool(QMainWindow):
         self.mask_img_view.setPixmap(QPixmap(self.mask_filename))
         self.mask_img_frame.show()
         
+
+    def chooseDirectory(self):
+        directory_path = QFileDialog.getExistingDirectory(self, "Select directory")
+        if not directory_path:
+            return
+
+        window_title = os.path.basename(os.path.normpath(directory_path)) or directory_path
+        directory_window = QMainWindow(self)
+        directory_window.setWindowTitle(window_title)
+        directory_window.resize(600, 400)
+        directory_window.setCentralWidget(QWidget())
+        directory_window.show()
+        self.directory_windows.append(directory_window)
+        directory_window.destroyed.connect(lambda _, w=directory_window: self._removeDirectoryWindow(w))
+
+
+    def _removeDirectoryWindow(self, window):
+        if window in self.directory_windows:
+            self.directory_windows.remove(window)
+
 
     def runSegmentation(self):
         
