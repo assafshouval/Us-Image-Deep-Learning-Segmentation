@@ -12,25 +12,27 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 from PyQt5.QtGui import QColor, QImage
-
+from PyQt5.QtWidgets import QPushButton, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
 
 class DirectorySegmentation(QMainWindow):
-    self._mask = None  # Mask overlay as QImage
-    self._mask_color = QColor(255, 0, 0, 128)  # Semi-transparent red
-    
-    def _init_mask(self):
-        if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
-            size = self._original_pixmap.size()
-            self._mask = QImage(size, QImage.Format_ARGB32_Premultiplied)
-            self._mask.fill(0)
-        else:
-            self._mask = None
-    
     def __init__(self, directory_path, parent=None):
         super().__init__(parent)
+        self._mask = None  # Mask overlay as QImage
+        self._mask_color = QColor(255, 0, 0, 128)  # Semi-transparent red
         self.directory_path = directory_path
         self.image_files = self._discover_images(directory_path)
         self.current_index = 0
+
+        # Initialize tool radio buttons and group early to avoid AttributeError
+        self.pen_radio = QRadioButton("Pen")
+        self.cursor_radio = QRadioButton("Cursor")
+        self.erase_radio = QRadioButton("Erase")
+        self.pen_radio.setChecked(True)
+        self.tool_group = QButtonGroup()
+        self.tool_group.addButton(self.pen_radio)
+        self.tool_group.addButton(self.cursor_radio)
+        self.tool_group.addButton(self.erase_radio)
 
         window_title = os.path.basename(os.path.normpath(directory_path)) or directory_path
         self.setWindowTitle(window_title)
@@ -39,7 +41,16 @@ class DirectorySegmentation(QMainWindow):
         self._setup_central_frame()
         self._setup_upper_toolbar()
         self._setup_lower_toolbar()
-        self._load_current_image()
+
+    def _init_mask(self):
+        if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
+            size = self._original_pixmap.size()
+            self._mask = QImage(size, QImage.Format_ARGB32_Premultiplied)
+            self._mask.fill(0)
+        else:
+            self._mask = None
+        self._setup_upper_toolbar()
+        self._setup_lower_toolbar()
 
     def _discover_images(self, directory_path):
         supported = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
@@ -93,10 +104,8 @@ class DirectorySegmentation(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setAllowedAreas(Qt.BottomToolBarArea)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
-
+        
         # --- Zoom control ---
-        from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
-
         zoom_label = QLabel("Zoom:")
         self.zoom_spin = QSpinBox()
         self.zoom_spin.setRange(10, 400)
@@ -105,14 +114,9 @@ class DirectorySegmentation(QMainWindow):
         self.zoom_spin.setSingleStep(10)
         self.zoom_spin.valueChanged.connect(self._on_zoom_changed)
 
-        # --- Tool selection (Pen/Cursor) ---
+        # --- Tool selection (Pen/Cursor/Erase) ---
         tool_label = QLabel("Tool:")
-        self.pen_radio = QRadioButton("Pen")
-        self.cursor_radio = QRadioButton("Cursor")
-        self.pen_radio.setChecked(True)
-        self.tool_group = QButtonGroup(toolbar)
-        self.tool_group.addButton(self.pen_radio)
-        self.tool_group.addButton(self.cursor_radio)
+        # Radio buttons and group are already initialized in __init__
         self.tool_group.buttonClicked.connect(self._on_tool_changed)
 
         # --- Pen radius control ---
@@ -122,6 +126,9 @@ class DirectorySegmentation(QMainWindow):
         self.radius_spin.setValue(10)
         self.radius_spin.setSingleStep(1)
         self.radius_spin.valueChanged.connect(self._on_radius_changed)
+         # --- Save button ---
+        save_btn = QPushButton("Save Mask")
+        save_btn.clicked.connect(self._save_mask)
 
         # Layout for controls
         controls_widget = QWidget()
@@ -134,11 +141,14 @@ class DirectorySegmentation(QMainWindow):
         controls_layout.addWidget(tool_label)
         controls_layout.addWidget(self.pen_radio)
         controls_layout.addWidget(self.cursor_radio)
+        controls_layout.addWidget(self.erase_radio)
         controls_layout.addSpacing(16)
         controls_layout.addWidget(radius_label)
         controls_layout.addWidget(self.radius_spin)
         controls_layout.addStretch()
-
+        
+        controls_layout.addSpacing(16)
+        controls_layout.addWidget(save_btn)
         toolbar.addWidget(controls_widget)
         self.addToolBar(Qt.BottomToolBarArea, toolbar)
 
@@ -164,11 +174,13 @@ class DirectorySegmentation(QMainWindow):
         self._update_image_display()
 
     def _on_tool_changed(self, button):
-        # Switch between pen and cursor (pan) tool
+        # Switch between pen, cursor (pan), and erase tool
         if self.cursor_radio.isChecked():
             self.image_label.setCursor(Qt.OpenHandCursor)
-        else:
+        elif self.pen_radio.isChecked():
             self.image_label.setCursor(Qt.CrossCursor)
+        elif self.erase_radio.isChecked():
+            self.image_label.setCursor(Qt.PointingHandCursor)
 
     def _on_radius_changed(self, value):
         # Placeholder: implement pen radius logic if needed
@@ -202,12 +214,14 @@ class DirectorySegmentation(QMainWindow):
             self.image_label.setPixmap(scaled_pixmap)
 
     def _load_current_image(self):
+
         if not self.image_files:
             self.image_label.setText("No image available")
             self.image_label.setPixmap(QPixmap())
             self._original_pixmap = None
-                self._mask = None
-                return
+            self._mask = None
+            return
+
 
         image_path = self.image_files[self.current_index]
         pixmap = QPixmap(image_path)
@@ -215,13 +229,14 @@ class DirectorySegmentation(QMainWindow):
             self.image_label.setText("Unable to load image")
             self.image_label.setPixmap(QPixmap())
             self._original_pixmap = None
-                self._mask = None
-                return
+            self._mask = None
+            return
+
 
         self._original_pixmap = pixmap
         self._zoom_factor = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
         self._pan_offset = getattr(self, '_pan_offset', (0, 0))
-            self._init_mask()
+        self._init_mask()
         self._update_image_display()
 
     def _set_pixmap_scaled(self, pixmap):
@@ -237,6 +252,10 @@ class DirectorySegmentation(QMainWindow):
                 self._dragging = True
                 self._drag_start = event.pos()
                 self._pan_start = getattr(self, '_pan_offset', (0, 0))
+        elif (self.pen_radio.isChecked() or self.erase_radio.isChecked()) and event.button() == Qt.LeftButton:
+            if self.image_label.underMouse():
+                self._drawing = True
+                self._draw_at(event.pos())
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -257,12 +276,54 @@ class DirectorySegmentation(QMainWindow):
                 new_pan_y = min(max(new_pan_y, 0), max_y)
             self._pan_offset = (new_pan_x, new_pan_y)
             self._update_image_display()
+        elif getattr(self, '_drawing', False) and (self.pen_radio.isChecked() or self.erase_radio.isChecked()):
+            if self.image_label.underMouse():
+                self._draw_at(event.pos())
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         if getattr(self, '_dragging', False) and event.button() == Qt.LeftButton:
             self._dragging = False
+        if getattr(self, '_drawing', False) and event.button() == Qt.LeftButton:
+            self._drawing = False
         super().mouseReleaseEvent(event)
+
+    def _draw_at(self, widget_pos):
+        # Map widget_pos to image coordinates
+        if not hasattr(self, '_original_pixmap') or self._original_pixmap is None or self._mask is None:
+            return
+        label_size = self.image_label.size()
+        zoom = self.zoom_spin.value() / 100.0
+        pan_x, pan_y = getattr(self, '_pan_offset', (0, 0))
+        # Get the visible area in the label
+        x = widget_pos.x()
+        y = widget_pos.y()
+        # Map to scaled image coordinates
+        img_x = int((x + pan_x) / zoom)
+        img_y = int((y + pan_y) / zoom)
+        radius = self.radius_spin.value()
+        painter = QPainter(self._mask)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        if self.pen_radio.isChecked():
+            painter.setBrush(self._mask_color)
+            painter.drawEllipse(img_x - radius, img_y - radius, radius * 2, radius * 2)
+        elif self.erase_radio.isChecked():
+            painter.setCompositionMode(QPainter.CompositionMode_Clear)
+            painter.setBrush(Qt.transparent)
+            painter.drawEllipse(img_x - radius, img_y - radius, radius * 2, radius * 2)
+        painter.end()
+        self._update_image_display()
+
+    def _save_mask(self):
+        if self._mask is None:
+            QMessageBox.warning(self, "Save Mask", "No mask to save.")
+            return
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save Mask Image", "mask.png", "PNG Files (*.png);;All Files (*)", options=options)
+        if file_path:
+            self._mask.save(file_path, "PNG")
+            QMessageBox.information(self, "Save Mask", f"Mask saved to {file_path}")
 
     def _go_previous(self):
         if not self.image_files:
