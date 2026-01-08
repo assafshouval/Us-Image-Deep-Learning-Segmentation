@@ -11,9 +11,21 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from PyQt5.QtGui import QColor, QImage
 
 
 class DirectorySegmentation(QMainWindow):
+    self._mask = None  # Mask overlay as QImage
+    self._mask_color = QColor(255, 0, 0, 128)  # Semi-transparent red
+    
+    def _init_mask(self):
+        if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
+            size = self._original_pixmap.size()
+            self._mask = QImage(size, QImage.Format_ARGB32_Premultiplied)
+            self._mask.fill(0)
+        else:
+            self._mask = None
+    
     def __init__(self, directory_path, parent=None):
         super().__init__(parent)
         self.directory_path = directory_path
@@ -131,46 +143,126 @@ class DirectorySegmentation(QMainWindow):
         self.addToolBar(Qt.BottomToolBarArea, toolbar)
 
     def _on_zoom_changed(self, value):
-        # Placeholder: implement zoom logic if needed
-        self._load_current_image()
+        # Update zoom and reset pan if needed
+        prev_zoom = getattr(self, '_zoom_factor', 1.0)
+        self._zoom_factor = value / 100.0
+        # Optionally, keep pan center
+        if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
+            if prev_zoom != self._zoom_factor:
+                # Adjust pan to keep center
+                label_size = self.image_label.size()
+                pan_x, pan_y = getattr(self, '_pan_offset', (0, 0))
+                center_x = pan_x + label_size.width() // 2
+                center_y = pan_y + label_size.height() // 2
+                new_scaled_width = int(self._original_pixmap.width() * self._zoom_factor)
+                new_scaled_height = int(self._original_pixmap.height() * self._zoom_factor)
+                new_pan_x = max(0, center_x - label_size.width() // 2)
+                new_pan_y = max(0, center_y - label_size.height() // 2)
+                max_x = max(0, new_scaled_width - label_size.width())
+                max_y = max(0, new_scaled_height - label_size.height())
+                self._pan_offset = (min(new_pan_x, max_x), min(new_pan_y, max_y))
+        self._update_image_display()
 
     def _on_tool_changed(self, button):
-        # Placeholder: implement tool switching logic if needed
-        pass
+        # Switch between pen and cursor (pan) tool
+        if self.cursor_radio.isChecked():
+            self.image_label.setCursor(Qt.OpenHandCursor)
+        else:
+            self.image_label.setCursor(Qt.CrossCursor)
 
     def _on_radius_changed(self, value):
         # Placeholder: implement pen radius logic if needed
         pass
 
+    def _update_image_display(self):
+        if not hasattr(self, '_original_pixmap') or self._original_pixmap is None:
+            return
+        label_size = self.image_label.size()
+        zoom = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
+        orig_pixmap = self._original_pixmap
+        # Calculate scaled size
+        scaled_width = int(orig_pixmap.width() * zoom)
+        scaled_height = int(orig_pixmap.height() * zoom)
+        scaled_pixmap = orig_pixmap.scaled(scaled_width, scaled_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        # Pan logic: show a region of the scaled image if zoomed in
+        pan_x, pan_y = getattr(self, '_pan_offset', (0, 0))
+        # Ensure pan offset is within bounds
+        max_x = max(0, scaled_pixmap.width() - label_size.width())
+        max_y = max(0, scaled_pixmap.height() - label_size.height())
+        pan_x = min(max(pan_x, 0), max_x)
+        pan_y = min(max(pan_y, 0), max_y)
+        self._pan_offset = (pan_x, pan_y)
+
+        if scaled_pixmap.width() > label_size.width() or scaled_pixmap.height() > label_size.height():
+            # Crop the visible region
+            cropped = scaled_pixmap.copy(pan_x, pan_y, min(label_size.width(), scaled_pixmap.width()-pan_x), min(label_size.height(), scaled_pixmap.height()-pan_y))
+            self.image_label.setPixmap(cropped)
+        else:
+            self.image_label.setPixmap(scaled_pixmap)
+
     def _load_current_image(self):
         if not self.image_files:
             self.image_label.setText("No image available")
             self.image_label.setPixmap(QPixmap())
-            return
+            self._original_pixmap = None
+                self._mask = None
+                return
 
         image_path = self.image_files[self.current_index]
         pixmap = QPixmap(image_path)
         if pixmap.isNull():
             self.image_label.setText("Unable to load image")
             self.image_label.setPixmap(QPixmap())
-            return
+            self._original_pixmap = None
+                self._mask = None
+                return
 
-        self._set_pixmap_scaled(pixmap)
+        self._original_pixmap = pixmap
+        self._zoom_factor = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
+        self._pan_offset = getattr(self, '_pan_offset', (0, 0))
+            self._init_mask()
+        self._update_image_display()
 
     def _set_pixmap_scaled(self, pixmap):
-        if self.image_label.width() <= 0 or self.image_label.height() <= 0:
-            self.image_label.setPixmap(pixmap)
-            return
-        scaled = pixmap.scaled(
-            self.image_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-        )
-        self.image_label.setPixmap(scaled)
+        # Deprecated: replaced by _update_image_display
+        self._update_image_display()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        pixmap = self.image_label.pixmap()
-        if pixmap:
-            self._set_pixmap_scaled(pixmap)
+        self._update_image_display()
+    def mousePressEvent(self, event):
+        if self.cursor_radio.isChecked() and event.button() == Qt.LeftButton:
+            if self.image_label.underMouse():
+                self._dragging = True
+                self._drag_start = event.pos()
+                self._pan_start = getattr(self, '_pan_offset', (0, 0))
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if getattr(self, '_dragging', False) and self.cursor_radio.isChecked():
+            delta = event.pos() - self._drag_start
+            pan_x, pan_y = self._pan_start
+            new_pan_x = pan_x - delta.x()
+            new_pan_y = pan_y - delta.y()
+            # Clamp pan
+            if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
+                zoom = self.zoom_spin.value() / 100.0
+                scaled_width = int(self._original_pixmap.width() * zoom)
+                scaled_height = int(self._original_pixmap.height() * zoom)
+                label_size = self.image_label.size()
+                max_x = max(0, scaled_width - label_size.width())
+                max_y = max(0, scaled_height - label_size.height())
+                new_pan_x = min(max(new_pan_x, 0), max_x)
+                new_pan_y = min(max(new_pan_y, 0), max_y)
+            self._pan_offset = (new_pan_x, new_pan_y)
+            self._update_image_display()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if getattr(self, '_dragging', False) and event.button() == Qt.LeftButton:
+            self._dragging = False
+        super().mouseReleaseEvent(event)
 
     def _go_previous(self):
         if not self.image_files:
