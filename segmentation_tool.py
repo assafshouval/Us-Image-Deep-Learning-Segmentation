@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from image_processing import *
+from directory_segmentation import DirectorySegmentation
 
 
 _tf_module = None
@@ -280,11 +281,7 @@ class SegTool(QMainWindow):
         if not directory_path:
             return
 
-        window_title = os.path.basename(os.path.normpath(directory_path)) or directory_path
-        directory_window = QMainWindow(self)
-        directory_window.setWindowTitle(window_title)
-        directory_window.resize(600, 400)
-        directory_window.setCentralWidget(QWidget())
+        directory_window = DirectorySegmentation(directory_path, self)
         directory_window.show()
         self.directory_windows.append(directory_window)
         directory_window.destroyed.connect(lambda _, w=directory_window: self._removeDirectoryWindow(w))
