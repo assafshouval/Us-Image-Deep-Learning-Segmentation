@@ -82,11 +82,65 @@ class DirectorySegmentation(QMainWindow):
         toolbar.setAllowedAreas(Qt.BottomToolBarArea)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
 
-        placeholder_action = QAction("Manual Tool Placeholder", self)
-        placeholder_action.setEnabled(False)
-        toolbar.addAction(placeholder_action)
+        # --- Zoom control ---
+        from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
 
+        zoom_label = QLabel("Zoom:")
+        self.zoom_spin = QSpinBox()
+        self.zoom_spin.setRange(10, 400)
+        self.zoom_spin.setValue(100)
+        self.zoom_spin.setSuffix(" %")
+        self.zoom_spin.setSingleStep(10)
+        self.zoom_spin.valueChanged.connect(self._on_zoom_changed)
+
+        # --- Tool selection (Pen/Cursor) ---
+        tool_label = QLabel("Tool:")
+        self.pen_radio = QRadioButton("Pen")
+        self.cursor_radio = QRadioButton("Cursor")
+        self.pen_radio.setChecked(True)
+        self.tool_group = QButtonGroup(toolbar)
+        self.tool_group.addButton(self.pen_radio)
+        self.tool_group.addButton(self.cursor_radio)
+        self.tool_group.buttonClicked.connect(self._on_tool_changed)
+
+        # --- Pen radius control ---
+        radius_label = QLabel("Radius:")
+        self.radius_spin = QSpinBox()
+        self.radius_spin.setRange(1, 100)
+        self.radius_spin.setValue(10)
+        self.radius_spin.setSingleStep(1)
+        self.radius_spin.valueChanged.connect(self._on_radius_changed)
+
+        # Layout for controls
+        controls_widget = QWidget()
+        controls_layout = QHBoxLayout(controls_widget)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(8)
+        controls_layout.addWidget(zoom_label)
+        controls_layout.addWidget(self.zoom_spin)
+        controls_layout.addSpacing(16)
+        controls_layout.addWidget(tool_label)
+        controls_layout.addWidget(self.pen_radio)
+        controls_layout.addWidget(self.cursor_radio)
+        controls_layout.addSpacing(16)
+        controls_layout.addWidget(radius_label)
+        controls_layout.addWidget(self.radius_spin)
+        controls_layout.addStretch()
+
+        toolbar.addWidget(controls_widget)
         self.addToolBar(Qt.BottomToolBarArea, toolbar)
+
+    def _on_zoom_changed(self, value):
+        # Placeholder: implement zoom logic if needed
+        self._load_current_image()
+
+    def _on_tool_changed(self, button):
+        # Placeholder: implement tool switching logic if needed
+        pass
+
+    def _on_radius_changed(self, value):
+        # Placeholder: implement pen radius logic if needed
+        pass
 
     def _load_current_image(self):
         if not self.image_files:
