@@ -7,12 +7,23 @@ Created on Sun May 30 01:27:18 2021
 from scipy import signal
 from PIL import Image 
 import numpy as np
-import tensorflow as tf
 import sys, os
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from image_processing import *
+
+
+_tf_module = None
+
+
+def _get_tf():
+    """Lazy-load TensorFlow so the UI starts faster."""
+    global _tf_module
+    if _tf_module is None:
+        import tensorflow as tf
+        _tf_module = tf
+    return _tf_module
 
 
 class AppConfig:
@@ -409,6 +420,7 @@ def save_image(seg_img_array, seg_filename):
         
 
 def make_prediction(sized_array, model_path="models/UNET_a_160.h5"): # keep the first combo box item as default value
+    tf = _get_tf()
     loaded_model = tf.keras.models.load_model(model_path, compile=False) # load model
     seg_img_array = create_img_from_predictions(make_predictions(sized_array, loaded_model)) # perform forward prediction
 
