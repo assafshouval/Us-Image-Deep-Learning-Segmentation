@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PyQt5.QtGui import QColor, QImage
+from PyQt5.QtGui import QColor, QImage, QPainter
 from PyQt5.QtWidgets import QPushButton, QFileDialog, QMessageBox
 from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
 
@@ -41,6 +41,11 @@ class DirectorySegmentation(QMainWindow):
         self._setup_central_frame()
         self._setup_upper_toolbar()
         self._setup_lower_toolbar()
+        self._load_current_image()
+
+    def _ensure_mask(self):
+        if self._mask is None:
+            self._init_mask()
 
     def _init_mask(self):
         if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
@@ -49,6 +54,39 @@ class DirectorySegmentation(QMainWindow):
             self._mask.fill(0)
         else:
             self._mask = None
+
+    def _render_mask_overlay(self, base_pixmap, scaled_width, scaled_height, pan_x, pan_y):
+        if self._mask is None or base_pixmap.isNull():
+            return base_pixmap
+        mask_scaled = self._mask.scaled(scaled_width, scaled_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        mask_region = mask_scaled.copy(pan_x, pan_y, base_pixmap.width(), base_pixmap.height())
+        painter = QPainter(base_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.drawImage(0, 0, mask_region)
+        painter.end()
+        return base_pixmap
+
+    def _map_label_pos_to_image(self, event_pos):
+        if not hasattr(self, '_original_pixmap') or self._original_pixmap is None:
+            return None
+        if self.image_label.pixmap() is None:
+            return None
+        label_pos = self.image_label.mapFrom(self, event_pos)
+        label_rect = self.image_label.rect()
+        pixmap = self.image_label.pixmap()
+        offset_x = (label_rect.width() - pixmap.width()) // 2
+        offset_y = (label_rect.height() - pixmap.height()) // 2
+        local_x = label_pos.x() - offset_x
+        local_y = label_pos.y() - offset_y
+        if local_x < 0 or local_y < 0 or local_x >= pixmap.width() or local_y >= pixmap.height():
+            return None
+        zoom = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
+        pan_x, pan_y = getattr(self, '_pan_offset', (0, 0))
+        image_x = int((local_x + pan_x) / zoom)
+        image_y = int((local_y + pan_y) / zoom)
+        if image_x < 0 or image_y < 0 or image_x >= self._original_pixmap.width() or image_y >= self._original_pixmap.height():
+            return None
+        return image_x, image_y
 
     def _discover_images(self, directory_path):
         supported = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
@@ -206,10 +244,14 @@ class DirectorySegmentation(QMainWindow):
 
         if scaled_pixmap.width() > label_size.width() or scaled_pixmap.height() > label_size.height():
             # Crop the visible region
-            cropped = scaled_pixmap.copy(pan_x, pan_y, min(label_size.width(), scaled_pixmap.width()-pan_x), min(label_size.height(), scaled_pixmap.height()-pan_y))
-            self.image_label.setPixmap(cropped)
+            visible_width = min(label_size.width(), scaled_pixmap.width() - pan_x)
+            visible_height = min(label_size.height(), scaled_pixmap.height() - pan_y)
+            cropped = scaled_pixmap.copy(pan_x, pan_y, visible_width, visible_height)
+            composed = self._render_mask_overlay(cropped, scaled_width, scaled_height, pan_x, pan_y)
+            self.image_label.setPixmap(composed)
         else:
-            self.image_label.setPixmap(scaled_pixmap)
+            composed = self._render_mask_overlay(scaled_pixmap, scaled_width, scaled_height, pan_x, pan_y)
+            self.image_label.setPixmap(composed)
 
     def _load_current_image(self):
 
@@ -251,9 +293,12 @@ class DirectorySegmentation(QMainWindow):
                 self._drag_start = event.pos()
                 self._pan_start = getattr(self, '_pan_offset', (0, 0))
         elif (self.pen_radio.isChecked() or self.erase_radio.isChecked()) and event.button() == Qt.LeftButton:
-            if self.image_label.underMouse():
+            target = self._map_label_pos_to_image(event.pos())
+            if target is not None:
+                self._ensure_mask()
                 self._drawing = True
-                self._draw_at(event.pos())
+                self._last_draw_point = target
+                self._apply_stroke(target, target)
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -275,8 +320,10 @@ class DirectorySegmentation(QMainWindow):
             self._pan_offset = (new_pan_x, new_pan_y)
             self._update_image_display()
         elif getattr(self, '_drawing', False) and (self.pen_radio.isChecked() or self.erase_radio.isChecked()):
-            if self.image_label.underMouse():
-                self._draw_at(event.pos())
+            target = self._map_label_pos_to_image(event.pos())
+            if target is not None:
+                self._apply_stroke(self._last_draw_point, target)
+                self._last_draw_point = target
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -284,32 +331,29 @@ class DirectorySegmentation(QMainWindow):
             self._dragging = False
         if getattr(self, '_drawing', False) and event.button() == Qt.LeftButton:
             self._drawing = False
+            self._last_draw_point = None
         super().mouseReleaseEvent(event)
 
-    def _draw_at(self, widget_pos):
-        # Map widget_pos to image coordinates
-        if not hasattr(self, '_original_pixmap') or self._original_pixmap is None or self._mask is None:
+    def _apply_stroke(self, start_point, end_point):
+        if self._mask is None or start_point is None or end_point is None:
             return
-        label_size = self.image_label.size()
-        zoom = self.zoom_spin.value() / 100.0
-        pan_x, pan_y = getattr(self, '_pan_offset', (0, 0))
-        # Get the visible area in the label
-        x = widget_pos.x()
-        y = widget_pos.y()
-        # Map to scaled image coordinates
-        img_x = int((x + pan_x) / zoom)
-        img_y = int((y + pan_y) / zoom)
         radius = self.radius_spin.value()
         painter = QPainter(self._mask)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(Qt.NoPen)
-        if self.pen_radio.isChecked():
-            painter.setBrush(self._mask_color)
-            painter.drawEllipse(img_x - radius, img_y - radius, radius * 2, radius * 2)
-        elif self.erase_radio.isChecked():
+        pen_width = max(1, radius * 2)
+        if self.erase_radio.isChecked():
             painter.setCompositionMode(QPainter.CompositionMode_Clear)
-            painter.setBrush(Qt.transparent)
-            painter.drawEllipse(img_x - radius, img_y - radius, radius * 2, radius * 2)
+            painter.setPen(QColor(0, 0, 0, 0))
+        else:
+            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+            painter.setPen(self._mask_color)
+        painter.setBrush(Qt.NoBrush)
+        pen = painter.pen()
+        pen.setWidth(pen_width)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
+        painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
         painter.end()
         self._update_image_display()
 
