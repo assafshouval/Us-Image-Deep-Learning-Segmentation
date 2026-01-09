@@ -49,8 +49,6 @@ class DirectorySegmentation(QMainWindow):
             self._mask.fill(0)
         else:
             self._mask = None
-        self._setup_upper_toolbar()
-        self._setup_lower_toolbar()
 
     def _discover_images(self, directory_path):
         supported = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
