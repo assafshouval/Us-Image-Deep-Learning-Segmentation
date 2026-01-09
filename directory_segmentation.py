@@ -1,7 +1,7 @@
 import os
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtGui import QPixmap, QCursor, QPen
 from PyQt5.QtWidgets import (
     QAction,
     QFrame,
@@ -208,6 +208,7 @@ class DirectorySegmentation(QMainWindow):
         controls_layout.addWidget(save_btn)
         toolbar.addWidget(controls_widget)
         self.addToolBar(Qt.BottomToolBarArea, toolbar)
+        self._update_tool_cursor()
 
     def _on_zoom_changed(self, value):
         # Update zoom and reset pan if needed
@@ -231,17 +232,21 @@ class DirectorySegmentation(QMainWindow):
         self._update_image_display()
 
     def _on_tool_changed(self, button):
-        # Switch between pen, cursor (pan), and erase tool
-        if self.cursor_radio.isChecked():
-            self.image_label.setCursor(Qt.OpenHandCursor)
-        elif self.pen_radio.isChecked():
-            self.image_label.setCursor(Qt.CrossCursor)
-        elif self.erase_radio.isChecked():
-            self.image_label.setCursor(Qt.PointingHandCursor)
+        self._update_tool_cursor()
 
     def _on_radius_changed(self, value):
-        # Placeholder: implement pen radius logic if needed
-        pass
+        self._update_tool_cursor()
+
+    def _update_tool_cursor(self):
+        if not hasattr(self, 'image_label'):
+            return
+        if self.cursor_radio.isChecked():
+            self.image_label.setCursor(Qt.OpenHandCursor)
+        elif self.pen_radio.isChecked() or self.erase_radio.isChecked():
+            cursor = self._make_brush_cursor(self.radius_spin.value())
+            self.image_label.setCursor(cursor)
+        else:
+            self.image_label.setCursor(Qt.ArrowCursor)
 
     def _update_image_display(self):
         if not hasattr(self, '_original_pixmap') or self._original_pixmap is None:
@@ -377,6 +382,28 @@ class DirectorySegmentation(QMainWindow):
         painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
         painter.end()
         self._update_image_display()
+
+    #TODO: use it from a picture resource
+    def _make_brush_cursor(self, radius):
+        radius = max(1, radius)
+        padding = 6
+        diameter = radius * 2
+        size = diameter + padding * 2
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(Qt.white)
+        pen.setWidth(2)
+        painter.setPen(pen)
+        center = QPoint(size // 2, size // 2)
+        painter.drawEllipse(center, radius, radius)
+        cross_half = min(radius, max(2, radius - 2))
+        painter.drawLine(center.x() - cross_half, center.y(), center.x() + cross_half, center.y())
+        painter.drawLine(center.x(), center.y() - cross_half, center.x(), center.y() + cross_half)
+        painter.end()
+        hotspot = QPoint(center.x(), center.y())
+        return QCursor(pixmap, hotspot.x(), hotspot.y())
 
     def _choose_overlay_color(self):
         chosen = QColorDialog.getColor(self._overlay_color, self, "Select Overlay Color")
