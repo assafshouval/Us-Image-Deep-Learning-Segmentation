@@ -13,13 +13,15 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QColor, QImage, QPainter
 from PyQt5.QtWidgets import QPushButton, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QColorDialog
 from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
 
 class DirectorySegmentation(QMainWindow):
     def __init__(self, directory_path, parent=None):
         super().__init__(parent)
         self._mask = None  # Mask overlay as QImage
-        self._mask_color = QColor(255, 0, 0, 128)  # Semi-transparent red
+        self._overlay_color = QColor(255, 0, 0)
+        self._overlay_alpha = 128
         self.directory_path = directory_path
         self.image_files = self._discover_images(directory_path)
         self.current_index = 0
@@ -60,9 +62,10 @@ class DirectorySegmentation(QMainWindow):
             return base_pixmap
         mask_scaled = self._mask.scaled(scaled_width, scaled_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         mask_region = mask_scaled.copy(pan_x, pan_y, base_pixmap.width(), base_pixmap.height())
+        tinted = self._tint_mask_fragment(mask_region)
         painter = QPainter(base_pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.drawImage(0, 0, mask_region)
+        painter.drawImage(0, 0, tinted)
         painter.end()
         return base_pixmap
 
@@ -162,6 +165,18 @@ class DirectorySegmentation(QMainWindow):
         self.radius_spin.setValue(10)
         self.radius_spin.setSingleStep(1)
         self.radius_spin.valueChanged.connect(self._on_radius_changed)
+
+        overlay_label = QLabel("Overlay:")
+        self.color_button = QPushButton()
+        self.color_button.setFixedSize(36, 20)
+        self.color_button.clicked.connect(self._choose_overlay_color)
+        opacity_label = QLabel("Opacity:")
+        self.alpha_spin = QSpinBox()
+        self.alpha_spin.setRange(0, 255)
+        self.alpha_spin.setValue(self._overlay_alpha)
+        self.alpha_spin.setSingleStep(5)
+        self.alpha_spin.valueChanged.connect(self._on_alpha_changed)
+        self._update_color_button()
          # --- Save button ---
         save_btn = QPushButton("Save Mask")
         save_btn.clicked.connect(self._save_mask)
@@ -181,6 +196,12 @@ class DirectorySegmentation(QMainWindow):
         controls_layout.addSpacing(16)
         controls_layout.addWidget(radius_label)
         controls_layout.addWidget(self.radius_spin)
+        controls_layout.addSpacing(16)
+        controls_layout.addWidget(overlay_label)
+        controls_layout.addWidget(self.color_button)
+        controls_layout.addSpacing(8)
+        controls_layout.addWidget(opacity_label)
+        controls_layout.addWidget(self.alpha_spin)
         controls_layout.addStretch()
         
         controls_layout.addSpacing(16)
@@ -346,7 +367,7 @@ class DirectorySegmentation(QMainWindow):
             painter.setPen(QColor(0, 0, 0, 0))
         else:
             painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
-            painter.setPen(self._mask_color)
+            painter.setPen(QColor(255, 255, 255, 255))
         painter.setBrush(Qt.NoBrush)
         pen = painter.pen()
         pen.setWidth(pen_width)
@@ -356,6 +377,40 @@ class DirectorySegmentation(QMainWindow):
         painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
         painter.end()
         self._update_image_display()
+
+    def _choose_overlay_color(self):
+        chosen = QColorDialog.getColor(self._overlay_color, self, "Select Overlay Color")
+        if chosen.isValid():
+            self._overlay_color = QColor(chosen.red(), chosen.green(), chosen.blue())
+            self._update_color_button()
+            self._update_image_display()
+
+    def _on_alpha_changed(self, value):
+        self._overlay_alpha = value
+        self._update_image_display()
+
+    def _update_color_button(self):
+        self.color_button.setStyleSheet(
+            "background-color: rgb({0}, {1}, {2}); border: 1px solid #444;".format(
+                self._overlay_color.red(),
+                self._overlay_color.green(),
+                self._overlay_color.blue()
+            )
+        )
+
+    def _tint_mask_fragment(self, fragment):
+        if fragment.isNull():
+            return fragment
+        source = fragment.convertToFormat(QImage.Format_ARGB32_Premultiplied)
+        tinted = QImage(source.size(), QImage.Format_ARGB32_Premultiplied)
+        color = QColor(self._overlay_color)
+        color.setAlpha(self._overlay_alpha)
+        tinted.fill(color)
+        painter = QPainter(tinted)
+        painter.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+        painter.drawImage(0, 0, source)
+        painter.end()
+        return tinted
 
     def _save_mask(self):
         if self._mask is None:
