@@ -118,9 +118,13 @@ class SegTool(QMainWindow):
         browse_mask_image.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
         browse_mask_image.clicked.connect(self.getMaskFile)
 
-        open_directory_button = QPushButton("Open directory")
-        open_directory_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
-        open_directory_button.clicked.connect(self.chooseDirectory)
+        create_workspace_button = QPushButton("Create Workspace")
+        create_workspace_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
+        create_workspace_button.clicked.connect(self.createWorkspace)
+        
+        open_workspace_button = QPushButton("Open Workspace")
+        open_workspace_button.setMinimumWidth(AppConfig.BUTTON_WIDTH_SMALL)
+        open_workspace_button.clicked.connect(self.openWorkspace)
 
         parametres_layout = QGridLayout(parametre_box)
         
@@ -134,7 +138,8 @@ class SegTool(QMainWindow):
         parametres_layout.addWidget(choose_mask_image, 2, 0)
 
         parametres_layout.addWidget(browse_mask_image, 2, 1)
-        parametres_layout.addWidget(open_directory_button, 3, 0, 1, 2)
+        parametres_layout.addWidget(create_workspace_button, 3, 0)
+        parametres_layout.addWidget(open_workspace_button, 3, 1)
     
     # IMAGE DISPLAY FRAME
         # US IMAGE FRAME
@@ -276,12 +281,35 @@ class SegTool(QMainWindow):
         self.mask_img_frame.show()
         
 
-    def chooseDirectory(self):
-        directory_path = QFileDialog.getExistingDirectory(self, "Select directory")
+    def createWorkspace(self):
+        """Create a new workspace from a source directory."""
+        directory_path = QFileDialog.getExistingDirectory(self, "Select source directory")
         if not directory_path:
             return
 
-        directory_window = DirectorySegmentation(directory_path, self)
+        directory_window = DirectorySegmentation(directory_path, self, workspace_mode="create")
+        directory_window.show()
+        self.directory_windows.append(directory_window)
+        directory_window.destroyed.connect(lambda _, w=directory_window: self._removeDirectoryWindow(w))
+    
+    def openWorkspace(self):
+        """Open an existing workspace directory."""
+        workspace_path = QFileDialog.getExistingDirectory(self, "Select workspace directory")
+        if not workspace_path:
+            return
+        
+        # Check if the selected directory contains config.yml
+        config_file = os.path.join(workspace_path, "config.yml")
+        if not os.path.exists(config_file):
+            QMessageBox.warning(
+                self,
+                "Invalid Workspace",
+                "The selected directory is not a valid workspace.\n\n"
+                "A workspace directory should contain a config.yml file."
+            )
+            return
+        
+        directory_window = DirectorySegmentation(workspace_path, self, workspace_mode="open")
         directory_window.show()
         self.directory_windows.append(directory_window)
         directory_window.destroyed.connect(lambda _, w=directory_window: self._removeDirectoryWindow(w))

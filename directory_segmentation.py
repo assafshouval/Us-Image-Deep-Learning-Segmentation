@@ -1,4 +1,6 @@
 import os
+import yaml
+from pathlib import Path
 
 from PyQt5.QtCore import Qt, QPoint, QEvent
 from PyQt5.QtGui import QPixmap, QCursor, QPen
@@ -20,13 +22,24 @@ from output_manager import OutputManager
 from workspace_config import WorkspaceConfig
 
 class DirectorySegmentation(QMainWindow):
-    def __init__(self, directory_path, parent=None):
+    def __init__(self, directory_path, parent=None, workspace_mode="create"):
         super().__init__(parent)
         self._mask = None  # Mask overlay as QImage
         self._overlay_color = QColor(255, 0, 0)
         self._overlay_alpha = 128
-        self.directory_path = directory_path
-        self.image_files = self._discover_images(directory_path)
+        self.workspace_mode = workspace_mode  # "create" or "open"
+        self.workspace_path = None
+        
+        if workspace_mode == "open":
+            # Opening existing workspace
+            self.workspace_path = directory_path
+            self.directory_path = self._load_input_directory_from_config(directory_path)
+            self.image_files = self._discover_images_from_workspace(directory_path)
+        else:
+            # Creating new workspace from source directory
+            self.directory_path = directory_path
+            self.image_files = self._discover_images(directory_path)
+        
         self.current_index = 0
 
         # Initialize undo/redo stacks
@@ -43,18 +56,29 @@ class DirectorySegmentation(QMainWindow):
         self.tool_group.addButton(self.cursor_radio)
         self.tool_group.addButton(self.erase_radio)
 
-        window_title = os.path.basename(os.path.normpath(directory_path)) or directory_path
+        if workspace_mode == "open":
+            window_title = f"Workspace: {os.path.basename(os.path.normpath(directory_path))}"
+        else:
+            window_title = os.path.basename(os.path.normpath(directory_path)) or directory_path
         self.setWindowTitle(window_title)
         self.resize(960, 720)
 
         # Initialize output manager for workspace structure
-        self.output_manager = OutputManager(directory_path)
-        try:
-            self.original_dir, self.mask_dir = self.output_manager.initialize_structure()
-        except OSError as e:
-            QMessageBox.critical(self, "Workspace Error", f"Failed to create workspace: {e}")
-            self.original_dir = None
-            self.mask_dir = None
+        if workspace_mode == "open":
+            # Use existing workspace path
+            self.output_manager = None  # Not creating new workspace
+            self.original_dir = os.path.join(directory_path, "OriginalImage")
+            self.mask_dir = os.path.join(directory_path, "Mask")
+        else:
+            # Create new workspace
+            self.output_manager = OutputManager(self.directory_path)
+            try:
+                self.original_dir, self.mask_dir = self.output_manager.initialize_structure()
+                self.workspace_path = self.output_manager.get_workspace_path()
+            except OSError as e:
+                QMessageBox.critical(self, "Workspace Error", f"Failed to create workspace: {e}")
+                self.original_dir = None
+                self.mask_dir = None
 
         self._setup_central_frame()
         self._setup_upper_toolbar()
@@ -72,6 +96,34 @@ class DirectorySegmentation(QMainWindow):
             self._mask.fill(0)
         else:
             self._mask = None
+    
+    def _load_existing_mask(self, image_path):
+        """Load saved mask for current image if it exists in workspace"""
+        # Get the base filename without extension
+        image_filename = os.path.basename(image_path)
+        image_basename = os.path.splitext(image_filename)[0]
+        
+        # Construct mask filename using naming pattern
+        mask_filename = f"{image_basename}_mask.png"
+        mask_path = os.path.join(self.mask_dir, mask_filename)
+        
+        # Try to load the mask
+        if os.path.exists(mask_path):
+            loaded_mask = QImage(mask_path)
+            if not loaded_mask.isNull():
+                # Ensure mask matches image size
+                if hasattr(self, '_original_pixmap') and self._original_pixmap is not None:
+                    size = self._original_pixmap.size()
+                    if loaded_mask.size() != size:
+                        # Scale mask to match image size
+                        loaded_mask = loaded_mask.scaled(size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+                    
+                    # Convert to ARGB32_Premultiplied format
+                    self._mask = loaded_mask.convertToFormat(QImage.Format_ARGB32_Premultiplied)
+                    return
+        
+        # If no mask found or loading failed, create empty mask
+        self._init_mask()
 
     def _render_mask_overlay(self, base_pixmap, scaled_width, scaled_height, pan_x, pan_y):
         if self._mask is None or base_pixmap.isNull():
@@ -107,6 +159,24 @@ class DirectorySegmentation(QMainWindow):
             return None
         return image_x, image_y
 
+    def _load_input_directory_from_config(self, workspace_path):
+        """Load the original input directory path from config.yml"""
+        config_file = os.path.join(workspace_path, "config.yml")
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                return config.get('input_directory', workspace_path)
+        except Exception as e:
+            print(f"Warning: Could not load config.yml: {e}")
+            return workspace_path
+    
+    def _discover_images_from_workspace(self, workspace_path):
+        """Discover images from OriginalImage folder in workspace"""
+        original_image_dir = os.path.join(workspace_path, "OriginalImage")
+        if not os.path.exists(original_image_dir):
+            return []
+        return self._discover_images(original_image_dir)
+    
     def _discover_images(self, directory_path):
         supported = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
         items = os.listdir(directory_path) if os.path.isdir(directory_path) else []
@@ -344,7 +414,12 @@ class DirectorySegmentation(QMainWindow):
         self._original_pixmap = pixmap
         self._zoom_factor = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
         self._pan_offset = getattr(self, '_pan_offset', (0, 0))
-        self._init_mask()
+        
+        # Load existing mask if in "open" mode
+        if self.workspace_mode == "open" and self.mask_dir:
+            self._load_existing_mask(image_path)
+        else:
+            self._init_mask()
         
         # Clear undo/redo stacks when loading a new image
         self._undo_stack.clear()
@@ -534,7 +609,7 @@ class DirectorySegmentation(QMainWindow):
             QMessageBox.warning(self, "Save Mask", "No mask to save.")
             return
         
-        if self.output_manager is None or self.original_dir is None:
+        if self.mask_dir is None:
             QMessageBox.critical(self, "Save Error", "Workspace not initialized.")
             return
         
@@ -542,16 +617,35 @@ class DirectorySegmentation(QMainWindow):
         current_image_path = self.image_files[self.current_index]
         
         try:
-            orig_path, mask_path = self.output_manager.save_mask_with_original(
-                current_image_path,
-                self._mask
-            )
+            if self.workspace_mode == "create" and self.output_manager:
+                # Use OutputManager for new workspaces
+                orig_path, mask_path = self.output_manager.save_mask_with_original(
+                    current_image_path,
+                    self._mask
+                )
+            else:
+                # Save directly to workspace for opened workspaces
+                image_filename = os.path.basename(current_image_path)
+                image_basename = os.path.splitext(image_filename)[0]
+                mask_filename = f"{image_basename}_mask.png"
+                mask_path = os.path.join(self.mask_dir, mask_filename)
+                
+                # Save mask
+                success = self._mask.save(mask_path, "PNG")
+                if not success:
+                    raise IOError(f"Failed to save mask to {mask_path}")
+                
+                # Copy original if it doesn't exist
+                orig_path = os.path.join(self.original_dir, image_filename)
+                if not os.path.exists(orig_path):
+                    import shutil
+                    shutil.copy2(current_image_path, orig_path)
             
             # Show success message with paths
             QMessageBox.information(
                 self, 
                 "Mask Saved",
-                f"Files saved successfully:\n\nOriginal: {orig_path}\n\nMask: {mask_path}"
+                f"Files saved successfully:\\n\\nMask: {mask_path}"
             )
         except (IOError, OSError, ValueError, RuntimeError) as e:
             QMessageBox.critical(self, "Save Error", f"Failed to save mask: {e}")
