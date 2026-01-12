@@ -210,10 +210,6 @@ class DirectorySegmentation(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setAllowedAreas(Qt.TopToolBarArea)
 
-        back_action = QAction("Back", self)
-        back_action.triggered.connect(self.close)
-        toolbar.addAction(back_action)
-
         prev_action = QAction("Prev", self)
         prev_action.triggered.connect(self._go_previous)
         toolbar.addAction(prev_action)
