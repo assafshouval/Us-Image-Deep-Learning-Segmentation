@@ -46,9 +46,12 @@ class OutputManager:
         self.original_dir = None
         self.mask_dir = None
     
-    def initialize_structure(self) -> tuple:
+    def initialize_structure(self, copy_all_images=True) -> tuple:
         """
         Create workspace directory structure.
+        
+        Args:
+            copy_all_images: If True, copy all image files from source to OriginalImage directory
         
         Returns:
             tuple: (original_image_dir, mask_dir) - Paths to created directories
@@ -88,6 +91,10 @@ class OutputManager:
         # Create config.yml with input directory information
         self._create_config_file()
         
+        # Copy all image files if requested
+        if copy_all_images:
+            self._copy_all_images_to_workspace()
+        
         return str(original_dir), str(mask_dir)
     
     def _create_config_file(self):
@@ -108,6 +115,34 @@ class OutputManager:
                 yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
         except Exception as e:
             print(f"Warning: Failed to create config.yml: {e}")
+    
+    def _copy_all_images_to_workspace(self):
+        """
+        Copy all image files from source directory to OriginalImage directory.
+        """
+        if self.original_dir is None:
+            return
+        
+        supported_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
+        
+        try:
+            # Get all files from source directory
+            if not self.source_directory_path.exists():
+                print(f"Warning: Source directory does not exist: {self.source_directory_path}")
+                return
+            
+            copied_count = 0
+            for item in self.source_directory_path.iterdir():
+                if item.is_file() and item.suffix.lower() in supported_extensions:
+                    dest_path = self.original_dir / item.name
+                    if not dest_path.exists():
+                        shutil.copy2(str(item), str(dest_path))
+                        copied_count += 1
+            
+            print(f"Copied {copied_count} image(s) to {self.original_dir}")
+        
+        except Exception as e:
+            print(f"Warning: Error copying images to workspace: {e}")
     
     def save_mask_with_original(self, image_path, mask_qimage, naming_pattern=None) -> tuple:
         """
@@ -146,7 +181,7 @@ class OutputManager:
         mask_filename = naming_pattern.format(basename=basename)
         mask_dest = self.mask_dir / mask_filename
         
-        # Copy original image (if not already exists)
+        # Copy original image only if not already exists (workspace creation should handle this)
         try:
             if not original_dest.exists():
                 shutil.copy2(str(image_path), str(original_dest))
