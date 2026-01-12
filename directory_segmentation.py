@@ -82,8 +82,10 @@ class DirectorySegmentation(QMainWindow):
 
         self._setup_central_frame()
         self._setup_upper_toolbar()
+        self._setup_info_bar()
         self._setup_lower_toolbar()
         self._load_current_image()
+        self._update_info_bar()
 
     def _ensure_mask(self):
         if self._mask is None:
@@ -229,6 +231,75 @@ class DirectorySegmentation(QMainWindow):
         toolbar.addAction(settings_action)
 
         self.addToolBar(Qt.TopToolBarArea, toolbar)
+
+    def _setup_info_bar(self):
+        """Create info bar showing workspace path, current image, and mask progress"""
+        info_frame = QFrame(self)
+        info_frame.setFrameShape(QFrame.StyledPanel)
+        info_frame.setStyleSheet("QFrame { background-color: #f0f0f0; padding: 4px; }")
+        
+        info_layout = QVBoxLayout(info_frame)
+        info_layout.setContentsMargins(8, 4, 8, 4)
+        info_layout.setSpacing(2)
+        
+        # Workspace path label
+        self.workspace_label = QLabel()
+        self.workspace_label.setStyleSheet("font-weight: bold; color: #333;")
+        info_layout.addWidget(self.workspace_label)
+        
+        # Current image label
+        self.current_image_label = QLabel()
+        self.current_image_label.setStyleSheet("color: #555;")
+        info_layout.addWidget(self.current_image_label)
+        
+        # Mask progress label
+        self.mask_progress_label = QLabel()
+        self.mask_progress_label.setStyleSheet("color: #555;")
+        info_layout.addWidget(self.mask_progress_label)
+        
+        # Add to main window as a toolbar
+        toolbar = QToolBar("Info Bar", self)
+        toolbar.setMovable(False)
+        toolbar.setAllowedAreas(Qt.TopToolBarArea)
+        toolbar.addWidget(info_frame)
+        self.addToolBar(Qt.TopToolBarArea, toolbar)
+
+    def _update_info_bar(self):
+        """Update the info bar with current workspace, image, and mask statistics"""
+        # Update workspace path
+        if self.workspace_path:
+            self.workspace_label.setText(f"Workspace: {self.workspace_path}")
+        else:
+            self.workspace_label.setText(f"Source Directory: {self.directory_path}")
+        
+        # Update current image
+        if self.image_files and 0 <= self.current_index < len(self.image_files):
+            current_image = os.path.basename(self.image_files[self.current_index])
+            self.current_image_label.setText(f"Current Image: {current_image} ({self.current_index + 1}/{len(self.image_files)})")
+        else:
+            self.current_image_label.setText("Current Image: None")
+        
+        # Update mask progress (count existing masks)
+        masked_count = self._count_masked_images()
+        total_count = len(self.image_files) if self.image_files else 0
+        self.mask_progress_label.setText(f"Masked Images: {masked_count}/{total_count}")
+
+    def _count_masked_images(self):
+        """Count how many images have corresponding mask files"""
+        if not self.mask_dir or not os.path.exists(self.mask_dir):
+            return 0
+        
+        count = 0
+        for image_path in self.image_files:
+            image_filename = os.path.basename(image_path)
+            image_basename = os.path.splitext(image_filename)[0]
+            mask_filename = f"{image_basename}_mask.png"
+            mask_path = os.path.join(self.mask_dir, mask_filename)
+            
+            if os.path.exists(mask_path):
+                count += 1
+        
+        return count
 
     def _setup_lower_toolbar(self):
         toolbar = QToolBar("Manual Segmentation", self)
@@ -646,6 +717,9 @@ class DirectorySegmentation(QMainWindow):
                 "Mask Saved",
                 f"Files saved successfully:\\n\\nMask: {mask_path}"
             )
+            
+            # Update info bar to reflect new mask count
+            self._update_info_bar()
         except (IOError, OSError, ValueError, RuntimeError) as e:
             QMessageBox.critical(self, "Save Error", f"Failed to save mask: {e}")
     
@@ -658,12 +732,14 @@ class DirectorySegmentation(QMainWindow):
             return
         self.current_index = (self.current_index - 1) % len(self.image_files)
         self._load_current_image()
+        self._update_info_bar()
 
     def _go_next(self):
         if not self.image_files:
             return
         self.current_index = (self.current_index + 1) % len(self.image_files)
         self._load_current_image()
+        self._update_info_bar()
 
     def wheelEvent(self, event):
         """Handle wheel events anywhere in the window to change focused spinbox"""
