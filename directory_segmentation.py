@@ -342,6 +342,7 @@ class DirectorySegmentation(QMainWindow):
                 max_y = max(0, new_scaled_height - label_size.height())
                 self._pan_offset = (min(new_pan_x, max_x), min(new_pan_y, max_y))
         self._update_image_display()
+        self._update_tool_cursor()  # Update cursor size when zoom changes
 
     def _on_tool_changed(self, button):
         self._update_tool_cursor()
@@ -355,7 +356,8 @@ class DirectorySegmentation(QMainWindow):
         if self.cursor_radio.isChecked():
             self.image_label.setCursor(Qt.OpenHandCursor)
         elif self.pen_radio.isChecked() or self.erase_radio.isChecked():
-            cursor = self._make_brush_cursor(self.radius_spin.value())
+            zoom = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
+            cursor = self._make_brush_cursor(self.radius_spin.value(), zoom)
             self.image_label.setCursor(cursor)
         else:
             self.image_label.setCursor(Qt.ArrowCursor)
@@ -509,10 +511,11 @@ class DirectorySegmentation(QMainWindow):
         self._update_image_display()
 
     #TODO: use it from a picture resource
-    def _make_brush_cursor(self, radius):
-        radius = max(1, radius)
+    def _make_brush_cursor(self, radius, zoom=1.0):
+        # Scale radius by zoom factor for visual feedback
+        scaled_radius = max(1, int(radius * zoom))
         padding = 6
-        diameter = radius * 2
+        diameter = scaled_radius * 2
         size = diameter + padding * 2
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
@@ -522,8 +525,8 @@ class DirectorySegmentation(QMainWindow):
         pen.setWidth(2)
         painter.setPen(pen)
         center = QPoint(size // 2, size // 2)
-        painter.drawEllipse(center, radius, radius)
-        cross_half = min(radius, max(2, radius - 2))
+        painter.drawEllipse(center, scaled_radius, scaled_radius)
+        cross_half = min(scaled_radius, max(2, scaled_radius - 2))
         painter.drawLine(center.x() - cross_half, center.y(), center.x() + cross_half, center.y())
         painter.drawLine(center.x(), center.y() - cross_half, center.x(), center.y() + cross_half)
         painter.end()
