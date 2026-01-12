@@ -16,6 +16,8 @@ from PyQt5.QtWidgets import QPushButton, QFileDialog, QMessageBox
 from PyQt5.QtWidgets import QColorDialog
 from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
 
+from output_manager import OutputManager
+
 class DirectorySegmentation(QMainWindow):
     def __init__(self, directory_path, parent=None):
         super().__init__(parent)
@@ -43,6 +45,15 @@ class DirectorySegmentation(QMainWindow):
         window_title = os.path.basename(os.path.normpath(directory_path)) or directory_path
         self.setWindowTitle(window_title)
         self.resize(960, 720)
+
+        # Initialize output manager for workspace structure
+        self.output_manager = OutputManager(directory_path)
+        try:
+            self.original_dir, self.mask_dir = self.output_manager.initialize_structure()
+        except OSError as e:
+            QMessageBox.critical(self, "Workspace Error", f"Failed to create workspace: {e}")
+            self.original_dir = None
+            self.mask_dir = None
 
         self._setup_central_frame()
         self._setup_upper_toolbar()
@@ -507,14 +518,32 @@ class DirectorySegmentation(QMainWindow):
         self.redo_btn.setEnabled(len(self._redo_stack) > 0)
 
     def _save_mask(self):
+        """Save mask using OutputManager - automatically organizes files in workspace."""
         if self._mask is None:
             QMessageBox.warning(self, "Save Mask", "No mask to save.")
             return
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save Mask Image", "mask.png", "PNG Files (*.png);;All Files (*)", options=options)
-        if file_path:
-            self._mask.save(file_path, "PNG")
-            QMessageBox.information(self, "Save Mask", f"Mask saved to {file_path}")
+        
+        if self.output_manager is None or self.original_dir is None:
+            QMessageBox.critical(self, "Save Error", "Workspace not initialized.")
+            return
+        
+        # Get current image path
+        current_image_path = self.image_files[self.current_index]
+        
+        try:
+            orig_path, mask_path = self.output_manager.save_mask_with_original(
+                current_image_path,
+                self._mask
+            )
+            
+            # Show success message with paths
+            QMessageBox.information(
+                self, 
+                "Mask Saved",
+                f"Files saved successfully:\n\nOriginal: {orig_path}\n\nMask: {mask_path}"
+            )
+        except (IOError, OSError, ValueError, RuntimeError) as e:
+            QMessageBox.critical(self, "Save Error", f"Failed to save mask: {e}")
 
     def _go_previous(self):
         if not self.image_files:
