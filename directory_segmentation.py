@@ -26,6 +26,10 @@ class DirectorySegmentation(QMainWindow):
         self.image_files = self._discover_images(directory_path)
         self.current_index = 0
 
+        # Initialize undo/redo stacks
+        self._undo_stack = []
+        self._redo_stack = []
+
         # Initialize tool radio buttons and group early to avoid AttributeError
         self.pen_radio = QRadioButton("Pen")
         self.cursor_radio = QRadioButton("Cursor")
@@ -145,10 +149,14 @@ class DirectorySegmentation(QMainWindow):
         toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
         
         # --- Undo/Redo buttons ---
-        undo_btn = QPushButton("Undo")
-        undo_btn.setFixedWidth(60)
-        redo_btn = QPushButton("Redo")
-        redo_btn.setFixedWidth(60)
+        self.undo_btn = QPushButton("Undo")
+        self.undo_btn.setFixedWidth(60)
+        self.undo_btn.clicked.connect(self._undo)
+        self.undo_btn.setEnabled(False)
+        self.redo_btn = QPushButton("Redo")
+        self.redo_btn.setFixedWidth(60)
+        self.redo_btn.clicked.connect(self._redo)
+        self.redo_btn.setEnabled(False)
         
         # --- Zoom control ---
         zoom_label = QLabel("Zoom:")
@@ -192,8 +200,8 @@ class DirectorySegmentation(QMainWindow):
         controls_layout = QHBoxLayout(controls_widget)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(8)
-        controls_layout.addWidget(undo_btn)
-        controls_layout.addWidget(redo_btn)
+        controls_layout.addWidget(self.undo_btn)
+        controls_layout.addWidget(self.redo_btn)
         controls_layout.addSpacing(16)
         controls_layout.addWidget(zoom_label)
         controls_layout.addWidget(self.zoom_spin)
@@ -312,6 +320,13 @@ class DirectorySegmentation(QMainWindow):
         self._zoom_factor = self.zoom_spin.value() / 100.0 if hasattr(self, 'zoom_spin') else 1.0
         self._pan_offset = getattr(self, '_pan_offset', (0, 0))
         self._init_mask()
+        
+        # Clear undo/redo stacks when loading a new image
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        if hasattr(self, 'undo_btn'):
+            self._update_undo_redo_buttons()
+        
         self._update_image_display()
 
     def _set_pixmap_scaled(self, pixmap):
@@ -331,6 +346,7 @@ class DirectorySegmentation(QMainWindow):
             target = self._map_label_pos_to_image(event.pos())
             if target is not None:
                 self._ensure_mask()
+                self._save_mask_state()  # Save state before drawing
                 self._drawing = True
                 self._last_draw_point = target
                 self._apply_stroke(target, target)
@@ -447,6 +463,45 @@ class DirectorySegmentation(QMainWindow):
         painter.drawImage(0, 0, source)
         painter.end()
         return tinted
+
+    def _save_mask_state(self):
+        """Save current mask state to undo stack before modification"""
+        if self._mask is not None:
+            # Create a deep copy of the mask
+            mask_copy = self._mask.copy()
+            self._undo_stack.append(mask_copy)
+            # Clear redo stack when new action is performed
+            self._redo_stack.clear()
+            self._update_undo_redo_buttons()
+
+    def _undo(self):
+        """Undo the last mask operation"""
+        if not self._undo_stack:
+            return
+        # Save current state to redo stack
+        if self._mask is not None:
+            self._redo_stack.append(self._mask.copy())
+        # Restore previous state
+        self._mask = self._undo_stack.pop()
+        self._update_undo_redo_buttons()
+        self._update_image_display()
+
+    def _redo(self):
+        """Redo the last undone operation"""
+        if not self._redo_stack:
+            return
+        # Save current state to undo stack
+        if self._mask is not None:
+            self._undo_stack.append(self._mask.copy())
+        # Restore next state
+        self._mask = self._redo_stack.pop()
+        self._update_undo_redo_buttons()
+        self._update_image_display()
+
+    def _update_undo_redo_buttons(self):
+        """Update enabled state of undo/redo buttons"""
+        self.undo_btn.setEnabled(len(self._undo_stack) > 0)
+        self.redo_btn.setEnabled(len(self._redo_stack) > 0)
 
     def _save_mask(self):
         if self._mask is None:
