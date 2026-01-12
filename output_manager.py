@@ -112,6 +112,8 @@ class OutputManager:
         
         try:
             with open(config_path, 'w', encoding='utf-8') as f:
+                # Write header comment
+                f.write("# Us-Image-Segmentation-Tool workspace configuration file\n")
                 yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
         except Exception as e:
             print(f"Warning: Failed to create config.yml: {e}")
