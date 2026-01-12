@@ -1,6 +1,6 @@
 import os
 
-from PyQt5.QtCore import Qt, QPoint
+from PyQt5.QtCore import Qt, QPoint, QEvent
 from PyQt5.QtGui import QPixmap, QCursor, QPen
 from PyQt5.QtWidgets import (
     QAction,
@@ -166,6 +166,7 @@ class DirectorySegmentation(QMainWindow):
         self.zoom_spin.setSuffix(" %")
         self.zoom_spin.setSingleStep(10)
         self.zoom_spin.valueChanged.connect(self._on_zoom_changed)
+        self.zoom_spin.setFocusPolicy(Qt.StrongFocus)
 
         # --- Tool selection (Pen/Cursor/Erase) ---
         tool_label = QLabel("Tool:")
@@ -179,6 +180,7 @@ class DirectorySegmentation(QMainWindow):
         self.radius_spin.setValue(10)
         self.radius_spin.setSingleStep(1)
         self.radius_spin.valueChanged.connect(self._on_radius_changed)
+        self.radius_spin.setFocusPolicy(Qt.StrongFocus)
 
         overlay_label = QLabel("Overlay:")
         self.color_button = QPushButton()
@@ -190,6 +192,7 @@ class DirectorySegmentation(QMainWindow):
         self.alpha_spin.setValue(self._overlay_alpha)
         self.alpha_spin.setSingleStep(5)
         self.alpha_spin.valueChanged.connect(self._on_alpha_changed)
+        self.alpha_spin.setFocusPolicy(Qt.StrongFocus)
         self._update_color_button()
          # --- Save button ---
         save_btn = QPushButton("Save Mask")
@@ -524,3 +527,19 @@ class DirectorySegmentation(QMainWindow):
             return
         self.current_index = (self.current_index + 1) % len(self.image_files)
         self._load_current_image()
+
+    def wheelEvent(self, event):
+        """Handle wheel events anywhere in the window to change focused spinbox"""
+        # Check which spinbox has focus
+        focused_widget = self.focusWidget()
+        if focused_widget in [self.zoom_spin, self.radius_spin, self.alpha_spin]:
+            # Get the wheel delta
+            delta = event.angleDelta().y()
+            if delta > 0:
+                focused_widget.stepUp()
+            elif delta < 0:
+                focused_widget.stepDown()
+            event.accept()
+            return
+        # If no spinbox has focus, pass event to base class
+        super().wheelEvent(event)
