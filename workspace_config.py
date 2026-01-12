@@ -6,6 +6,7 @@ Handles loading, saving, and validation of workspace settings.
 import json
 import os
 from pathlib import Path
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 
 class WorkspaceConfig:
@@ -101,3 +102,54 @@ class WorkspaceConfig:
         """
         config = cls.load()
         return config.get("naming_pattern", cls.DEFAULT_NAMING_PATTERN)
+    
+    @classmethod
+    def set_workspace_root(cls, new_root: str) -> None:
+        """
+        Update workspace root in configuration.
+        
+        Args:
+            new_root: New workspace root path
+        """
+        config = cls.load()
+        config["workspace_root"] = new_root
+        cls.save(config)
+    
+    @classmethod
+    def show_folder_selection_dialog(cls, parent=None) -> bool:
+        """
+        Show dialog to select workspace folder and update configuration.
+        
+        Args:
+            parent: Parent widget for the dialog
+            
+        Returns:
+            bool: True if folder was selected and saved, False if cancelled
+        """
+        current_workspace = cls.get_workspace_root()
+        
+        folder = QFileDialog.getExistingDirectory(
+            parent,
+            "Select Workspace Output Folder",
+            current_workspace,
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
+        )
+        
+        if folder:
+            try:
+                cls.set_workspace_root(folder)
+                QMessageBox.information(
+                    parent,
+                    "Workspace Updated",
+                    f"Workspace folder set to:\n{folder}"
+                )
+                return True
+            except IOError as e:
+                QMessageBox.critical(
+                    parent,
+                    "Configuration Error",
+                    f"Failed to save configuration: {e}"
+                )
+                return False
+        
+        return False

@@ -5,6 +5,7 @@ Handles creation of workspace structure and saving of masks with original images
 
 import os
 import shutil
+import yaml
 from datetime import datetime
 from pathlib import Path
 from PyQt5.QtGui import QImage
@@ -84,7 +85,29 @@ class OutputManager:
         self.original_dir = original_dir
         self.mask_dir = mask_dir
         
+        # Create config.yml with input directory information
+        self._create_config_file()
+        
         return str(original_dir), str(mask_dir)
+    
+    def _create_config_file(self):
+        """
+        Create config.yml file in workspace directory with input directory path.
+        """
+        if self.workspace_dir is None:
+            return
+        
+        config_path = self.workspace_dir / "config.yml"
+        
+        config_data = {
+            "input_directory": str(self.source_directory_path.resolve())
+        }
+        
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+        except Exception as e:
+            print(f"Warning: Failed to create config.yml: {e}")
     
     def save_mask_with_original(self, image_path, mask_qimage, naming_pattern=None) -> tuple:
         """

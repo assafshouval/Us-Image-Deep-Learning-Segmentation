@@ -1,0 +1,10 @@
+{
+  "workspace_root": "C:/repos/vibrant/Us-Image-Deep-Learning-Segmentation/workspace/Image2",
+  "naming_pattern": "{basename}_mask.png",
+  "subdirs": {
+    "original": "OriginalImage",
+    "mask": "Mask"
+  },
+  "overwrite_existing": true,
+  "create_timestamp_on_conflict": true
+}

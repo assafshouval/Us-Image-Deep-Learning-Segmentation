@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QColorDialog
 from PyQt5.QtWidgets import QSpinBox, QLabel, QRadioButton, QButtonGroup, QHBoxLayout, QWidget
 
 from output_manager import OutputManager
+from workspace_config import WorkspaceConfig
 
 class DirectorySegmentation(QMainWindow):
     def __init__(self, directory_path, parent=None):
@@ -150,6 +151,16 @@ class DirectorySegmentation(QMainWindow):
         next_action = QAction("Next", self)
         next_action.triggered.connect(self._go_next)
         toolbar.addAction(next_action)
+        
+        # Add spacer
+        spacer = QWidget()
+        spacer.setSizePolicy(QWidget().sizePolicy().Expanding, QWidget().sizePolicy().Preferred)
+        toolbar.addWidget(spacer)
+        
+        # Add Settings action
+        settings_action = QAction("⚙ Workspace Settings", self)
+        settings_action.triggered.connect(self._configure_workspace)
+        toolbar.addAction(settings_action)
 
         self.addToolBar(Qt.TopToolBarArea, toolbar)
 
@@ -544,6 +555,10 @@ class DirectorySegmentation(QMainWindow):
             )
         except (IOError, OSError, ValueError, RuntimeError) as e:
             QMessageBox.critical(self, "Save Error", f"Failed to save mask: {e}")
+    
+    def _configure_workspace(self):
+        """Show dialog to configure workspace output folder."""
+        WorkspaceConfig.show_folder_selection_dialog(self)
 
     def _go_previous(self):
         if not self.image_files:
