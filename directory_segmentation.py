@@ -144,6 +144,12 @@ class DirectorySegmentation(QMainWindow):
         toolbar.setAllowedAreas(Qt.BottomToolBarArea)
         toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
         
+        # --- Undo/Redo buttons ---
+        undo_btn = QPushButton("Undo")
+        undo_btn.setFixedWidth(60)
+        redo_btn = QPushButton("Redo")
+        redo_btn.setFixedWidth(60)
+        
         # --- Zoom control ---
         zoom_label = QLabel("Zoom:")
         self.zoom_spin = QSpinBox()
@@ -186,6 +192,9 @@ class DirectorySegmentation(QMainWindow):
         controls_layout = QHBoxLayout(controls_widget)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(8)
+        controls_layout.addWidget(undo_btn)
+        controls_layout.addWidget(redo_btn)
+        controls_layout.addSpacing(16)
         controls_layout.addWidget(zoom_label)
         controls_layout.addWidget(self.zoom_spin)
         controls_layout.addSpacing(16)
