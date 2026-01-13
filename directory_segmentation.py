@@ -711,13 +711,6 @@ class DirectorySegmentation(QMainWindow):
                     import shutil
                     shutil.copy2(current_image_path, orig_path)
             
-            # Show success message with paths
-            QMessageBox.information(
-                self, 
-                "Mask Saved",
-                f"Files saved successfully:\\n\\nMask: {mask_path}"
-            )
-            
             # Update info bar to reflect new mask count
             self._update_info_bar()
         except (IOError, OSError, ValueError, RuntimeError) as e:
@@ -730,6 +723,7 @@ class DirectorySegmentation(QMainWindow):
     def _go_previous(self):
         if not self.image_files:
             return
+        self._save_mask()
         self.current_index = (self.current_index - 1) % len(self.image_files)
         self._load_current_image()
         self._update_info_bar()
@@ -737,6 +731,7 @@ class DirectorySegmentation(QMainWindow):
     def _go_next(self):
         if not self.image_files:
             return
+        self._save_mask()
         self.current_index = (self.current_index + 1) % len(self.image_files)
         self._load_current_image()
         self._update_info_bar()
