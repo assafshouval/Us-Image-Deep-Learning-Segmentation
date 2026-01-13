@@ -103,10 +103,9 @@ class DirectorySegmentation(QMainWindow):
         """Load saved mask for current image if it exists in workspace"""
         # Get the base filename without extension
         image_filename = os.path.basename(image_path)
-        image_basename = os.path.splitext(image_filename)[0]
         
         # Construct mask filename using naming pattern
-        mask_filename = f"{image_basename}_mask.png"
+        mask_filename = image_filename
         mask_path = os.path.join(self.mask_dir, mask_filename)
         
         # Try to load the mask
@@ -292,9 +291,7 @@ class DirectorySegmentation(QMainWindow):
         count = 0
         for image_path in self.image_files:
             image_filename = os.path.basename(image_path)
-            image_basename = os.path.splitext(image_filename)[0]
-            mask_filename = f"{image_basename}_mask.png"
-            mask_path = os.path.join(self.mask_dir, mask_filename)
+            mask_path = os.path.join(self.mask_dir, image_filename)
             
             if os.path.exists(mask_path):
                 count += 1
@@ -705,9 +702,7 @@ class DirectorySegmentation(QMainWindow):
             else:
                 # Save directly to workspace for opened workspaces
                 image_filename = os.path.basename(current_image_path)
-                image_basename = os.path.splitext(image_filename)[0]
-                mask_filename = f"{image_basename}_mask.png"
-                mask_path = os.path.join(self.mask_dir, mask_filename)
+                mask_path = os.path.join(self.mask_dir, image_filename)
                 
                 # Save mask
                 success = self._mask.save(mask_path, "PNG")
@@ -779,3 +774,13 @@ class DirectorySegmentation(QMainWindow):
         
         # Pass event to base class for other keys
         super().keyPressEvent(event)
+    
+    #for every saved mask, copy original image to US_Images
+    def _copy_segmented_images(self):
+        import cv2
+        destination_directory = os.path.join(self.workspace_path, "US Images")
+        source_original_us_directory = os.path.join(self.workspace_path, "OriginalImage")
+        if not os.path.exists(destination_directory):
+            os.makedirs(destination_directory)
+        
+        for filename in os.listdir(self.mask_dir):
