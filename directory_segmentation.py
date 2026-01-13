@@ -667,6 +667,10 @@ class DirectorySegmentation(QMainWindow):
         self._mask = self._redo_stack.pop()
         self._update_undo_redo_buttons()
         self._update_image_display()
+    
+    def _changes_have_been_made(self) -> bool:
+        """Check if there are unsaved changes in the mask"""
+        return len(self._undo_stack) > 0
 
     def _update_undo_redo_buttons(self):
         """Update enabled state of undo/redo buttons"""
@@ -674,6 +678,8 @@ class DirectorySegmentation(QMainWindow):
         self.redo_btn.setEnabled(len(self._redo_stack) > 0)
 
     def _save_mask(self):
+        if not self._changes_have_been_made():
+            return
         """Save mask using OutputManager - automatically organizes files in workspace."""
         if self._mask is None:
             QMessageBox.warning(self, "Save Mask", "No mask to save.")
@@ -751,3 +757,22 @@ class DirectorySegmentation(QMainWindow):
             return
         # If no spinbox has focus, pass event to base class
         super().wheelEvent(event)
+
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts"""
+        # Ctrl+Z for undo
+        if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
+            if self.undo_btn.isEnabled():
+                self._undo()
+            event.accept()
+            return
+        
+        # Ctrl+Shift+Z for redo
+        if event.key() == Qt.Key_Z and event.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+            if self.redo_btn.isEnabled():
+                self._redo()
+            event.accept()
+            return
+        
+        # Pass event to base class for other keys
+        super().keyPressEvent(event)
