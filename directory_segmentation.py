@@ -518,6 +518,7 @@ class DirectorySegmentation(QMainWindow):
                 self._save_mask_state()  # Save state before drawing
                 self._drawing = True
                 self._last_draw_point = target
+                # Draw immediately at the press location
                 self._apply_stroke(target, target)
         super().mousePressEvent(event)
 
@@ -573,6 +574,8 @@ class DirectorySegmentation(QMainWindow):
         pen.setCapStyle(Qt.RoundCap)
         pen.setJoinStyle(Qt.RoundJoin)
         painter.setPen(pen)
+        if start_point == end_point:
+            painter.drawPoint(start_point[0], start_point[1])
         painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
         painter.end()
         self._update_image_display()
