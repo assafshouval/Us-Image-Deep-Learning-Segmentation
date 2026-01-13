@@ -229,6 +229,10 @@ class DirectorySegmentation(QMainWindow):
         settings_action.triggered.connect(self._configure_workspace)
         toolbar.addAction(settings_action)
 
+        prepare_dataset_action = QAction("📁 Prepare Dataset", self)
+        prepare_dataset_action.triggered.connect(self._copy_segmented_images)
+        toolbar.addAction(prepare_dataset_action)
+        
         self.addToolBar(Qt.TopToolBarArea, toolbar)
 
     def _setup_info_bar(self):
@@ -777,10 +781,23 @@ class DirectorySegmentation(QMainWindow):
     
     #for every saved mask, copy original image to US_Images
     def _copy_segmented_images(self):
-        import cv2
+        import shutil
         destination_directory = os.path.join(self.workspace_path, "US Images")
         source_original_us_directory = os.path.join(self.workspace_path, "OriginalImage")
         if not os.path.exists(destination_directory):
             os.makedirs(destination_directory)
         
         for filename in os.listdir(self.mask_dir):
+            original_image_path = os.path.join(source_original_us_directory, filename)
+            #check if original image exists and show a message if not
+            if not os.path.exists(original_image_path):
+                QMessageBox.warning(self, "Missing Image", f"Original image not found: {original_image_path}")
+                #delete folder and return
+                shutil.rmtree(destination_directory)
+                return
+            #copy to the destination directory:
+            destination_path = os.path.join(destination_directory, filename)
+            shutil.copy2(original_image_path, destination_path)
+
+        #show message when done:
+        QMessageBox.information(self, "Dataset Preparation", f"Segmented images copied to {destination_directory}.")

@@ -477,7 +477,6 @@ def make_prediction(sized_array, model_path="models/UNET_a_160.h5"): # keep the 
 
     return seg_img_array
 
-
 def main():
     if hasattr(Qt, 'AA_EnableHighDpiScaling'):
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
